@@ -1,0 +1,18 @@
+{
+	"0.1.0": {
+		"title": "YSS 动画控制器 0.1.0",
+		"date": "2026-10-14",
+		"categories": [
+			{
+				"title": "新功能",
+				"list": [
+					"新增「YSS」菜单：打开连招编辑器 / 打开攻击效果编辑器 / 设置 YSS 工程目录",
+					"连招编辑器：SVG 节点图编辑工程动画控制器，支持状态拖拽（位置随工程保存）、有向边/自环、初始状态标记、molang 条件构建器（yss.is_key_down/is_key_up/get_key 槽位 0-11、AND/OR 组合、原文双向同步）、普攻连招模板、导出控制器 JSON",
+					"攻击效果编辑器：读写 <根目录>/<modelId>/hit.json（新格式），支持 segments 全机制字段（knockback/knockup/hitstop/interrupt/damage_timing）、caster_moves、hover、root_motion、全局 width/height_scale、movement、entity_overrides；旧扁平格式加载时自动升级",
+					"保存前校验：时间窗倒置等错误阻断保存并定位字段，未知骨骼/动画名给警告",
+					"与 hit.json 联动：连招节点上的攻击动画显示伤害徽标，点击跳转攻击效果编辑器"
+				]
+			}
+		]
+	}
+}
