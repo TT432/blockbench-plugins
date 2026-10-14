@@ -1,0 +1,17 @@
+{
+	"yss_animation_controller": {
+		"title": "YSS Animation Controller",
+		"author": "TT432",
+		"description": "YesSteveSkill 专用动画控制器：在 Blockbench 里直接配置连招状态机（按键触发）、攻击判定段与打击效果（hit.json），保存即被游戏双端热重载。",
+		"icon": "account_tree",
+		"version": "0.1.0",
+		"variant": "desktop",
+		"min_version": "5.2.0",
+		"tags": ["Minecraft: Java Edition", "YesSteveModel", "YesSteveSkill", "Animation", "Combat"],
+		"new_repository_format": true,
+		"has_changelog": true,
+		"creation_date": "2026-10-14",
+		"repository": "https://github.com/TT432/blockbench-plugins",
+		"bug_tracker": "https://github.com/TT432/blockbench-plugins/issues"
+	}
+}
