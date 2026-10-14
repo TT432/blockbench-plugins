@@ -5,7 +5,7 @@ YesSteveSkill（YSS）专用编辑器插件：在 Blockbench 里直接编排连�
 ## 快速开始
 
 1. **设置工程目录**：菜单栏 → YSS → 设置 YSS 工程目录。
-   - 默认指向 dev 环境 `E:\_ideaProjects\yessteveskill\run\config\yes_steve_skill`。
+   - 无内置默认路径：点「浏览…」选择你的 `<游戏目录>/config/yes_steve_skill` 目录（即 YSS 模组存放各模型 `hit.json` 的配置根目录）。
    - modelId 默认从当前工程文件名推导（去路径与 `.zip/.7z/.ysm/.bbmodel` 后缀，非法字符转 `_`），可在此覆盖。
 2. 打开你的 YSM 模型工程（带攻击动画）。
 3. 两个编辑器：

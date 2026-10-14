@@ -1,7 +1,7 @@
 # YSS Animation Controller 插件规格
 
 > 需求来源：社区版反馈表 #99「YSS的专用动画控制器：在 bb 里直接配置 YSS 的连招/按键/攻击效果，类似 UE 蓝图」。
-> 数据模型依据：yessteveskill 仓库代码事实（`E:\_ideaProjects\yessteveskill`，见 §1 引用）。
+> 数据模型依据：yessteveskill 仓库代码事实（见 §1 引用）。
 > 版本：v0.1（2026-10-14）
 
 ## 0. 概念模型（YSS 侧事实，勿臆造）
@@ -9,7 +9,7 @@
 - **技能** = `hit.json` 的 `animation` map 里登记的 YSM 动画名；动画播放即释放，YSS 只观测不触发。
 - **连招** = YSM 动画控制器 JSON（基岩版 animation controller 状态机）中的状态迁移链，迁移条件用 molang；YSS 注入按键查询 `yss.is_key_down(n)` / `yss.is_key_up(n)` / `yss.get_key(n)`，n∈0..11（0=左键，1=右键，2~11=自定义键1~10，玩家在 MC 控制设置绑定）。
 - **攻击效果** = `hit.json` 中每个动画的 `segments`（HitSegment）+ `caster_moves` + `hover` + `root_motion`；全局 `width_scale`/`height_scale`/`movement`/`entity_overrides`。
-- **运行时路径**：`<游戏config>/yes_steve_skill/<modelId>/hit.json`（必需）+ 可选 `main.json`（几何覆盖）+ `animations.json`（动画+相机扩展）。双端读同一文件，mtime 失效自动热重载——**插件写文件即生效**。dev 环境即 `E:\_ideaProjects\yessteveskill\run\config\yes_steve_skill\`。
+- **运行时路径**：`<游戏config>/yes_steve_skill/<modelId>/hit.json`（必需）+ 可选 `main.json`（几何覆盖）+ `animations.json`（动画+相机扩展）。双端读同一文件，mtime 失效自动热重载——**插件写文件即生效**。
 - **modelId 规范化**：去路径前缀、剥 `.zip/.7z/.ysm` 后缀、Windows 非法字符 `<>:"/\|?*` 及控制字符 → `_`。
 - **协议约束**：`segments[]`/`caster_moves[]` 数组顺序 = 网络包索引，删除/重排会改索引语义（编辑器应提示）；`time` 单位秒（= animTicks/20），`end>=start`；`hover.duration>0`；`anti_interrupt∈[0,1]`；`width/height_scale>0`；knockup 滞空服务端钳 [10,60] tick。
 - **hit.json 永远写新格式**（`animation` 为对象 map）；旧扁平格式（数组）只读兼容，加载后保存即升级。
@@ -21,8 +21,8 @@
 - 入口：菜单栏新增「YSS」菜单（`MenuBar` addAction），含：
   1. `打开连招编辑器`（节点图对话框）
   2. `打开攻击效果编辑器`（hit.json 对话框）
-  3. `设置 YSS 工程目录`（默认 `E:\_ideaProjects\yessteveskill\run\config\yes_steve_skill`，持久化到 localStorage，可浏览更改）
-- modelId 推导：当前 Project 文件名规范化；可在设置中覆盖。无打开工程时两个编辑器均禁用并提示。
+  3. `设置 YSS 工程目录`（无内置默认路径，首次需浏览选择，持久化到 localStorage）
+- modelId 推导：当前 Project 文件名规范化；可在设置中覆盖。无打开工程时两个编辑器均禁用并提示。未设置工程目录时打开攻击效果编辑器会先引导至设置对话框（连招编辑器不依赖文件系统，hit.json 徽标缓存静默跳过）。
 
 ## 2. 攻击效果编辑器（hit.json）
 

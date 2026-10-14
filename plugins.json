@@ -4,7 +4,7 @@
 		"author": "TT432",
 		"description": "YesSteveSkill 专用动画控制器：在 Blockbench 里直接配置连招状态机（按键触发）、攻击判定段与打击效果（hit.json），保存即被游戏双端热重载。",
 		"icon": "account_tree",
-		"version": "0.1.0",
+		"version": "0.1.1",
 		"variant": "desktop",
 		"min_version": "5.2.0",
 		"tags": ["Minecraft: Java Edition", "YesSteveModel", "YesSteveSkill", "Animation", "Combat"],
