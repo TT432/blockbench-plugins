@@ -2103,7 +2103,7 @@
 		title: 'YSS 动画控制器',
 		author: 'YSS 社区',
 		description: 'YesSteveSkill 专用：在 Blockbench 中编排连招（动画控制器节点图 + molang 按键条件）并编辑攻击效果 hit.json。',
-		version: '0.1.1',
+		version: '0.1.2',
 		icon: 'sports_esports',
 		tags: ['Minecraft: Java Edition', 'Animation'],
 		variant: 'desktop',
