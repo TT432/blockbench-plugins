@@ -1,0 +1,122 @@
+name: plugin review
+
+# 安全模型（改动前务必读完）：
+# - 用 pull_request_target 而不是 pull_request，因为 fork PR 在 pull_request 事件下拿不到 secrets
+#   与写权限，而自动合并必须有写权限。
+# - 审查代码永远从 **base 分支** 检出；PR 内容只通过 `git fetch` 当作文本读取，
+#   **从不执行**（不 npm install、不跑 PR 里的任何脚本）。
+# - 规则层显式拒绝 `.github/**` 与 `scripts/**` 变更，PR 无法修改审查器来自证清白。
+# - 合并时用 --match-head-commit 锁定审查过的那个 commit，防御审查期间 force-push 换代码。
+
+on:
+  # 不过滤 paths：改了审查器的 PR 也必须被审（路径闸门会硬拒绝 .github/ 与 scripts/）
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'PR 编号（人工重跑）'
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: plugin-review-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+    steps:
+      - name: Checkout base branch (never the PR head)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch PR head as read-only data
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pr-head"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          FETCHED="$(git rev-parse origin/pr-head)"
+          echo "pr head sha=${HEAD_SHA:-<dispatch>} fetched=${FETCHED}"
+          # 审查对象必须与事件里的 head 一致；force-push 造成的错位交给人工
+          if [ -n "${HEAD_SHA}" ] && [ "${HEAD_SHA}" != "${FETCHED}" ]; then
+            echo "::error::PR head 在审查启动时已变动（${HEAD_SHA} != ${FETCHED}）"
+            exit 2
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run review
+        id: review
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          [ -n "$BASE" ] || BASE="$(git rev-parse HEAD)"
+          echo "base=$BASE head=$(git rev-parse origin/pr-head)"
+          node scripts/review/review.mjs --base "$BASE" --head origin/pr-head
+
+      - name: Publish report, labels and verdict
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ ! -f review-verdict.json ]; then
+            printf '<!-- plugin-review-report -->\n## 插件审查报告 · 执行失败\n\n审查流程异常退出，未产出结论，按需人工处理。\n\n<details><summary>日志</summary>\n\n```\n%s\n```\n\n</details>\n' "见 Actions 运行日志" > review-report.md
+            echo '{"verdict":"manual"}' > review-verdict.json
+          fi
+          VERDICT=$(node -p "require('./review-verdict.json').verdict || 'manual'")
+
+          MARKER='<!-- plugin-review-report -->'
+          COMMENT_ID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
+            --jq ".[] | select(.body | startswith(\"${MARKER}\")) | .id" | head -n1)
+          if [ -n "${COMMENT_ID}" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" -F body=@review-report.md >/dev/null
+          else
+            gh pr comment "${PR_NUMBER}" --body-file review-report.md >/dev/null
+          fi
+
+          gh label create review-passed --color 0e8a16 --description '自动审查通过' 2>/dev/null || true
+          gh label create review-failed --color d93f0b --description '自动审查未通过' 2>/dev/null || true
+          gh label create review-manual --color fbca04 --description '自动审查需人工处理' 2>/dev/null || true
+          for label in review-passed review-failed review-manual; do
+            gh pr edit "${PR_NUMBER}" --remove-label "$label" >/dev/null 2>&1 || true
+          done
+          case "$VERDICT" in
+            pass) gh pr edit "${PR_NUMBER}" --add-label review-passed >/dev/null ;;
+            fail) gh pr edit "${PR_NUMBER}" --add-label review-failed >/dev/null ;;
+            *)    gh pr edit "${PR_NUMBER}" --add-label review-manual >/dev/null ;;
+          esac
+          echo "verdict=${VERDICT}"
+
+      - name: Auto-merge on pass
+        if: always() && github.event_name == 'pull_request_target'
+        run: |
+          set -euo pipefail
+          VERDICT=$(node -p "require('./review-verdict.json').verdict || 'manual'" 2>/dev/null || echo manual)
+          if [ "$VERDICT" != "pass" ]; then
+            echo "verdict=${VERDICT}，不自动合并"
+            exit 0
+          fi
+          STATE=$(gh pr view "${PR_NUMBER}" --json state --jq .state)
+          DRAFT=$(gh pr view "${PR_NUMBER}" --json isDraft --jq .isDraft)
+          if [ "$STATE" != "OPEN" ] || [ "$DRAFT" = "true" ]; then
+            echo "PR state=${STATE} draft=${DRAFT}，跳过合并"
+            exit 0
+          fi
+          TITLE=$(gh pr view "${PR_NUMBER}" --json title --jq .title)
+          # --match-head-commit：只合并审查过的那个 commit，防审查期间 force-push 换代码
+          gh pr merge "${PR_NUMBER}" --squash --match-head-commit "${{ github.event.pull_request.head.sha }}" --subject "${TITLE} (#${PR_NUMBER})"
