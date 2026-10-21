@@ -103,21 +103,55 @@ jobs:
           esac
           echo "verdict=${VERDICT}"
 
-      - name: Auto-merge on pass
-        if: always() && github.event_name == 'pull_request_target'
+      - name: Upload verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-verdict
+          path: |
+            review-verdict.json
+            review-report.md
+          retention-days: 1
+          if-no-files-found: ignore
+
+  # 独立 job 的原因：必需检查 `review` 只有在本 job 结束后才变绿，
+  # 在同一 job 里合并会被分支保护拒绝（实测：base branch policy prohibits the merge）。
+  merge:
+    needs: review
+    if: github.event_name == 'pull_request_target' && needs.review.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: review-verdict
+
+      - name: Merge reviewed commit
         run: |
           set -euo pipefail
-          VERDICT=$(node -p "require('./review-verdict.json').verdict || 'manual'" 2>/dev/null || echo manual)
+          VERDICT=$(jq -r '.verdict // "manual"' review-verdict.json)
           if [ "$VERDICT" != "pass" ]; then
             echo "verdict=${VERDICT}，不自动合并"
             exit 0
           fi
           STATE=$(gh pr view "${PR_NUMBER}" --json state --jq .state)
           DRAFT=$(gh pr view "${PR_NUMBER}" --json isDraft --jq .isDraft)
+          NEW_HEAD=$(gh pr view "${PR_NUMBER}" --json headRefOid --jq .headRefOid)
           if [ "$STATE" != "OPEN" ] || [ "$DRAFT" = "true" ]; then
             echo "PR state=${STATE} draft=${DRAFT}，跳过合并"
             exit 0
           fi
+          if [ "$NEW_HEAD" != "$HEAD_SHA" ]; then
+            echo "PR head 已变动（${HEAD_SHA} -> ${NEW_HEAD}），交下一轮审查"
+            exit 0
+          fi
           TITLE=$(gh pr view "${PR_NUMBER}" --json title --jq .title)
           # --match-head-commit：只合并审查过的那个 commit，防审查期间 force-push 换代码
-          gh pr merge "${PR_NUMBER}" --squash --match-head-commit "${{ github.event.pull_request.head.sha }}" --subject "${TITLE} (#${PR_NUMBER})"
+          gh pr merge "${PR_NUMBER}" --squash --match-head-commit "${HEAD_SHA}" --subject "${TITLE} (#${PR_NUMBER})"
