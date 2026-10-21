@@ -131,8 +131,11 @@ async function main() {
 	const args = parseArgs(process.argv.slice(2));
 	const headSha = gitText(['rev-parse', args.head]).trim();
 	const baseSha = gitText(['rev-parse', args.base]).trim();
+	// PR 的真实改动是 merge-base..head。直接用 base..head 会把"分支落后于 base 造成的
+	// 反向变更"（例如作者分支上没有刚合入的工作流修复）当成 PR 内容，导致误判。
+	const mergeBase = gitText(['merge-base', args.base, args.head]).trim();
 
-	const changes = listChanges(args.base, args.head);
+	const changes = listChanges(mergeBase, args.head);
 	const files = new Map();
 	for (const change of changes) {
 		if (change.status === 'D') continue;
@@ -140,9 +143,9 @@ async function main() {
 		if (blob) files.set(change.path, blob);
 	}
 
-	const pjBase = readJson(args.base, 'plugins.json');
+	const pjBase = readJson(mergeBase, 'plugins.json');
 	const pjHead = readJson(args.head, 'plugins.json');
-	const upBase = readJson(args.base, 'updates.json');
+	const upBase = readJson(mergeBase, 'updates.json');
 	const upHead = readJson(args.head, 'updates.json');
 
 	// 先粗测被触及的 id，再加载整目录内容做全量确定性扫描
@@ -209,7 +212,7 @@ async function main() {
 	lines.push('<!-- plugin-review-report -->');
 	lines.push(`## 插件审查报告 · ${verdict === 'pass' ? '通过' : verdict === 'fail' ? '不通过' : '需人工'}`);
 	lines.push('');
-	lines.push(`> 自动审查 · \`${baseSha.slice(0, 7)}\` → \`${headSha.slice(0, 7)}\` · 插件：${touchedIds.map((id) => `\`${id}\``).join('、') || '（未识别）'}`);
+	lines.push(`> 自动审查 · base \`${baseSha.slice(0, 7)}\` / 变更基准 \`${mergeBase.slice(0, 7)}\` → \`${headSha.slice(0, 7)}\` · 插件：${touchedIds.map((id) => `\`${id}\``).join('、') || '（未识别）'}`);
 	lines.push('');
 	if (verdict === 'pass') {
 		lines.push(
@@ -282,7 +285,7 @@ async function main() {
 
 	const report = lines.join('\n') + '\n';
 	writeFileSync(args.out, report);
-	writeFileSync(args.verdictOut, JSON.stringify({ verdict, head: headSha, base: baseSha, ids: touchedIds, blocks: blocks.length, warns: warns.length, llmError }, null, 2) + '\n');
+	writeFileSync(args.verdictOut, JSON.stringify({ verdict, head: headSha, base: baseSha, mergeBase, ids: touchedIds, blocks: blocks.length, warns: warns.length, llmError }, null, 2) + '\n');
 
 	console.log(report);
 	console.error(`\nverdict=${verdict} blocks=${blocks.length} warns=${warns.length}${llmError ? ` llmError=${llmError}` : ''}`);
