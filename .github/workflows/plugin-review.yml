@@ -153,5 +153,10 @@ jobs:
             exit 0
           fi
           TITLE=$(gh pr view "${PR_NUMBER}" --json title --jq .title)
-          # --match-head-commit：只合并审查过的那个 commit，防审查期间 force-push 换代码
-          gh pr merge "${PR_NUMBER}" --squash --match-head-commit "${HEAD_SHA}" --subject "${TITLE} (#${PR_NUMBER})"
+          # 用 PR merge API 而不是 `gh pr merge`：本 job 没有 checkout（无 .git），
+          # 且 API 的 sha 参数同样锁死被审查的 commit，head 变了直接 409。
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge" \
+            -f merge_method=squash \
+            -f sha="${HEAD_SHA}" \
+            -f commit_title="${TITLE} (#${PR_NUMBER})" \
+            --jq '{merged, sha}'
