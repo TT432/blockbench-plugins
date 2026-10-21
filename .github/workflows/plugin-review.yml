@@ -62,7 +62,8 @@ jobs:
 
       - name: Run review
         id: review
-        continue-on-error: true
+        # 不设 continue-on-error：非 pass 时本 job 必须变红，否则分支保护要求的状态检查形同虚设。
+        # 后续的发布与合并步骤都带 if: always()，仍会执行。
         run: |
           set -o pipefail
           BASE="${{ github.event.pull_request.base.sha }}"
