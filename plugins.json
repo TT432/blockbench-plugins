@@ -18,6 +18,7 @@
 		"has_changelog": true,
 		"creation_date": "2026-10-14",
 		"repository": "https://github.com/TT432/blockbench-plugins",
-		"bug_tracker": "https://github.com/TT432/blockbench-plugins/issues"
+		"bug_tracker": "https://github.com/TT432/blockbench-plugins/issues",
+		"review_smoke": "protected-2026-10-21"
 	}
 }
