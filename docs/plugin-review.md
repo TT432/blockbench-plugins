@@ -46,10 +46,12 @@
 ## 自动合并的边界（为什么不是全自动）
 
 - **删除类 PR 不自动合并**：否则任何人可通过 PR 自动下架他人插件。
-- **非 pass 时检查变红**：`Run review` 失败会让 job 结论为 failure，因此可把 `review` 设为分支保护的必需检查；发布评论与合并步骤仍会执行（不自动合并）。
-- **分支保护不要开启「要求评审批准」**：否则自动合并在缺少人工 approval 时无法完成。
+- **非 pass 时检查变红**：`Run review` 失败会让 job 结论为 failure；发布评论与标签仍会执行（不自动合并）。
+- **两段 job**：`review` 出结论并变绿，`merge` 在其之后执行。合并不能写在同一个 job 里——必需检查只有 job 结束后才变绿，同 job 内合并会被分支保护拒绝。
+- **分支保护不要开启「要求评审批准」**：否则自动合并在缺少人工 approval 时无法完成。当前配置：必需检查 `review`、`strict=false`、`enforce_admins=false`。
 - **语义层不可用（缺 key、网络失败、输出不合结构）不自动合并**：fail-closed。
-- **合并锁定 commit**：`gh pr merge --match-head-commit`，审查完成后若被 force-push 换代码，合并失败。
+- **合并锁定 commit**：PR merge API 的 `sha` 参数设为被审查的 head，审查完成后再 force-push 会 409 而不会误合。
+- **变更基准是 merge-base**：`merge-base..head` 而不是 `base..head`，否则分支落后时会把"base 上新增内容的反向变更"算进 PR。
 - **PR 内容从不执行**：工作流用 `pull_request_target` 拿到写权限，但审查代码从 base 分支检出，PR 内容只作为文本读取。
 
 ## 维护者配置
