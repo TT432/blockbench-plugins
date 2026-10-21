@@ -7,10 +7,31 @@
 		"version": "0.1.2",
 		"variant": "desktop",
 		"min_version": "5.2.0",
-		"tags": ["Minecraft: Java Edition", "YesSteveModel", "YesSteveSkill", "Animation", "Combat"],
+		"tags": [
+			"Minecraft: Java Edition",
+			"YesSteveModel",
+			"YesSteveSkill",
+			"Animation",
+			"Combat"
+		],
 		"new_repository_format": true,
 		"has_changelog": true,
 		"creation_date": "2026-10-14",
+		"repository": "https://github.com/TT432/blockbench-plugins",
+		"bug_tracker": "https://github.com/TT432/blockbench-plugins/issues"
+	},
+	"review_smoke_evil": {
+		"title": "Review Smoke Evil",
+		"author": "TT432",
+		"description": "自动化审查的测试样本（不应被合并）",
+		"icon": "bug_report",
+		"version": "0.0.1",
+		"variant": "desktop",
+		"min_version": "5.2.0",
+		"tags": [
+			"Utility"
+		],
+		"new_repository_format": true,
 		"repository": "https://github.com/TT432/blockbench-plugins",
 		"bug_tracker": "https://github.com/TT432/blockbench-plugins/issues"
 	}
