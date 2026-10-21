@@ -57,7 +57,10 @@
 ## 维护者配置
 
 1. 仓库 secret：`DEEPSEEK_API_KEY`（缺省时所有 PR 都转人工，不会静默放行）。可选：`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` 通过工作流 env 覆盖。
-2. 建议开启 `master` 分支保护：禁止直接 push、要求 `plugin review` 检查通过。
+2. `master` 已开启分支保护：必需检查 `review`、禁止强推与删除分支、`enforce_admins=false`。
+   - 审查基础设施（`.github/**`、`scripts/**`）**不能走 PR**：路径闸门会硬拒绝并让检查变红。
+     维护者改动这些文件需直推 `master`（admin 绕过保护）。
+   - 手动兜底：`gh pr merge <n> --admin` 可以合并被审查拦下的 PR，用于误报处置。
 3. 本地自测（无需 key）：
 
    ```bash
