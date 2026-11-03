@@ -3,5 +3,10 @@
 		"version": "0.1.2",
 		"created": "2026-10-14",
 		"updated": "2026-10-15"
+	},
+	"ysm_utils": {
+		"version": "2.5.2-community.1",
+		"created": "2026-11-03",
+		"updated": "2026-11-03"
 	}
 }
