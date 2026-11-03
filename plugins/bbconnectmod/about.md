@@ -4,9 +4,11 @@
 
 ## 依赖
 
-本插件依赖 `ysm_utils`（YSM Mod Plugin）。缺少该前置时插件保持安装状态但不会启用，插件商店里会显示「缺少前置插件」并可直接安装。
+需要 **Blockbench 社区版 ≥ 5.3.85**（插件依赖与延后启用机制自 5.3.85 起提供）：https://github.com/TT432/blockbench
 
-同时需要在 1.20.1 Forge 客户端安装配套模组 `bbconnectmod`（https://github.com/TT432/bbconnectmod ，CI 构建产物在 Actions / Releases 里）。
+本插件依赖 `ysm_utils`（YSM Mod Plugin，社区源当前版本 `2.5.2-community.1`）。缺少该前置时插件保持安装状态但不会启用，插件商店里会显示「缺少前置插件」并可直接安装。
+
+同时需要在 1.20.1 Forge 客户端安装配套模组 `bbconnectmod`（https://github.com/TT432/bbconnectmod ，CI 构建产物在 Actions / Releases 里，README 有中英文安装与用法说明）。
 
 ## 工作方式
 
