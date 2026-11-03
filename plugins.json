@@ -41,5 +41,30 @@
 		],
 		"repository": "https://github.com/TT432/blockbench-plugins",
 		"bug_tracker": "https://github.com/TT432/blockbench-plugins/issues"
+	},
+	"bbconnectmod": {
+		"title": "BB Connect (YSM ↔ Blockbench)",
+		"author": "tt432",
+		"description": "把 Yes Steve Model 文件夹模型接到 Blockbench：游戏内「连接到 BB」直接打开项目，保存即写回模型文件夹并通知游戏重载。依赖 ysm_utils。",
+		"icon": "cable",
+		"version": "1.0.1",
+		"variant": "desktop",
+		"min_version": "5.3.85",
+		"tags": [
+			"Minecraft: Java Edition",
+			"Yes Steve Model",
+			"Bridge"
+		],
+		"new_repository_format": true,
+		"has_changelog": true,
+		"creation_date": "2026-11-03",
+		"contributors": [
+			"tt432"
+		],
+		"repository": "https://github.com/TT432/bbconnectmod",
+		"bug_tracker": "https://github.com/TT432/bbconnectmod/issues",
+		"dependencies": [
+			"ysm_utils"
+		]
 	}
 }
