@@ -1,0 +1,28 @@
+{
+  "plugin": "ysm_utils",
+  "version": "2.5.2-community.1",
+  "sourceBytes": 305343,
+  "ordinaryImport": {
+    "animations": 162,
+    "controllers": 2,
+    "textures": 1,
+    "networkRequests": 0,
+    "modelWrites": 0
+  },
+  "defaultTemplates": 31,
+  "checks": [
+    "registration and onload",
+    "directory cancellation",
+    "real model, texture, animation and controller read",
+    "file chooser cancel",
+    "permission denial",
+    "all default template files match pinned upstream",
+    "template cache",
+    "download failure leaves no partial pack",
+    "download retry",
+    "corrupt template rejected",
+    "destination race rejected",
+    "existing destination preserved"
+  ],
+  "passed": true
+}

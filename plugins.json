@@ -19,5 +19,27 @@
 		"creation_date": "2026-10-14",
 		"repository": "https://github.com/TT432/blockbench-plugins",
 		"bug_tracker": "https://github.com/TT432/blockbench-plugins/issues"
+	},
+	"ysm_utils": {
+		"title": "YSM Mod Plugin (Community)",
+		"author": "tartaric_acid",
+		"description": "Java 版 Yes Steve Model 模型包导入与编辑工具；适配 Blockbench Community 的原生模块权限和动画导入接口。",
+		"icon": "card_membership",
+		"version": "2.5.2-community.1",
+		"variant": "desktop",
+		"min_version": "5.3.74",
+		"tags": [
+			"Minecraft: Java Edition",
+			"Yes Steve Model",
+			"Mod"
+		],
+		"new_repository_format": true,
+		"has_changelog": true,
+		"creation_date": "2026-11-03",
+		"contributors": [
+			"TheDivisionISAC"
+		],
+		"repository": "https://github.com/TT432/blockbench-plugins",
+		"bug_tracker": "https://github.com/TT432/blockbench-plugins/issues"
 	}
 }

@@ -1,0 +1,24 @@
+{
+	"2.5.2-community.1": {
+		"title": "YSM 2.5.2 社区版兼容修订",
+		"date": "2026-11-03",
+		"author": "TheDivisionISAC",
+		"categories": [
+			{
+				"title": "兼容修复",
+				"list": [
+					"用公开文件选择接口替代 electron/currentwindow 全局变量；按需申请原生 dialog/shell 模块权限。",
+					"文件操作使用插件作用域 fs，文件去重支持同文件、硬链接及 Windows 路径大小写。",
+					"动画和控制器导入优先使用 AnimationCodec，保留旧接口回退。"
+				]
+			},
+			{
+				"title": "插件商店发布",
+				"list": [
+					"按社区注册表规范使用 ysm_utils ID，并保留上游作者及 MIT 许可。",
+					"移除构建调试数据；默认模板仅在新建模型包时从上游固定提交下载，并逐文件校验 SHA-256。"
+				]
+			}
+		]
+	}
+}
