@@ -6,7 +6,7 @@
 
 本插件依赖 `ysm_utils`（YSM Mod Plugin）。缺少该前置时插件保持安装状态但不会启用，插件商店里会显示「缺少前置插件」并可直接安装。
 
-同时需要在 1.20.1 Forge 客户端安装配套模组 `bbconnectmod`（本目录同源仓库）。
+同时需要在 1.20.1 Forge 客户端安装配套模组 `bbconnectmod`（https://github.com/TT432/bbconnectmod ，CI 构建产物在 Actions / Releases 里）。
 
 ## 工作方式
 

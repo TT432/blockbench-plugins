@@ -592,7 +592,7 @@
 	new BarMenu('bbconnectmod', ['bbconnectmod_status', 'bbconnectmod_sync']);
 	MenuBar.update();
 
-	Plugin.register(PLUGIN_ID, {
+	BBPlugin.register(PLUGIN_ID, {
 		title: 'BB Connect (YSM ↔ Blockbench)',
 		author: 'tt432',
 		description: '把 Yes Steve Model 文件夹模型接到 Blockbench：游戏内点击「连接到 BB」打开项目，保存即写回并通知游戏重载模型。',
