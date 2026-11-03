@@ -49,6 +49,10 @@ state.fs.writeFileSync(file, autoStringify(content));
 - Ctrl+S 的语义固定为「写 `.bbmodel` 存档」，几何/贴图/动画由插件自己的通道写回，两条路径不要互相触发；
 - 写回是整文件覆盖，因此要保留 YSM/基岩包内本插件不认识的字段，就不能靠 codec 覆盖，应在导入时保留原始 JSON 并在写回时只替换自己负责的部分。
 
+## 写回项目不要触发名称规范化
+
+Blockbench 的基岩版导出会按设置把不合规名称（空格、中文、数字开头等）替换成合规名。写回外部模型包时这是错的：包内 `ysm.json`、动画文件、实体定义都按名称引用骨骼/动画。在项目上留一个「外部接管」标记，并让导出/写回路径据此关闭改名——`bbconnectmod` 的做法是写 `Project.bbconnect_pack`（同时写 ysm_utils 约定的 `Project.ysm_project_info.path`），宿主据此把「Bedrock Export: Normalize Names」锁定为关闭。
+
 ## 增量写盘与「扫描窗口」约束
 
 整文件覆盖是对目标模型最省事的做法，但会被游戏端的目录扫描者观察到。实机撞到的两个约束：
