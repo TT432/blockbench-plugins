@@ -48,3 +48,25 @@ state.fs.writeFileSync(file, autoStringify(content));
 - 回写前把 `Project.export_path` / `Project.export_codec` 清空，避免 Ctrl+S 走核心的导出/覆盖分支；
 - Ctrl+S 的语义固定为「写 `.bbmodel` 存档」，几何/贴图/动画由插件自己的通道写回，两条路径不要互相触发；
 - 写回是整文件覆盖，因此要保留 YSM/基岩包内本插件不认识的字段，就不能靠 codec 覆盖，应在导入时保留原始 JSON 并在写回时只替换自己负责的部分。
+
+## 增量写盘与「扫描窗口」约束
+
+整文件覆盖是对目标模型最省事的做法，但会被游戏端的目录扫描者观察到。实机撞到的两个约束：
+
+- **按内容判断是否需要写**：每个即将写出的文件先读现有字节比较，一致就跳过。这样「无改动保存」不会改 mtime、不会触发游戏端重载（Yes Steve Model 用内容哈希标识模型，任何重写都会换 id 并把玩家选择打回默认模型）。
+  ```js
+  function writeIfChanged(file, data) {
+      const next = Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'utf8');
+      try {
+          const current = state.fs.readFileSync(file);
+          if (current.length === next.length && current.equals(next)) return false;
+      } catch (err) {
+          if (err && err.code !== 'ENOENT') throw err;   // 只有「文件不存在」才继续写
+      }
+      const tmp = file + '.bbtmp';
+      state.fs.writeFileSync(tmp, next);
+      state.fs.renameSync(tmp, file);      // 原子替换，避免扫描读到半个文件
+      return true;
+  }
+  ```
+- **同一目录同时只能有一批写入**：扫模型目录的一方（如 Yes Steve Model 的 `ReloadableModelCatalog`）会校验「扫描期间目录是否变化」，扫描中写盘会让整次扫描失败并保留旧目录（`Model source changed while loading` / `Model root changed while scanning`），玩家看到的是「保存了但游戏里没变」。协议里带确认回执（`sync_ack`）时，插件必须在回执到达前**不写盘**，把期间的保存合并成一次延后同步；没有回执机制时可退化为按时间串行（上一批写完后才能启动下一批）。

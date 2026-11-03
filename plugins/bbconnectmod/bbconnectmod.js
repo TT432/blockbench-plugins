@@ -13,6 +13,7 @@
 
 	const PLUGIN_ID = 'bbconnectmod';
 	const PROTOCOL_VERSION = 1;
+	const PLUGIN_VERSION = '1.0.1';
 	const DEFAULT_PORT = 41234;
 	const MAX_LINE_BYTES = 16 * 1024 * 1024;
 	const LS_PORT = 'bbconnectmod_port';
@@ -28,7 +29,15 @@
 		save_listener: null,
 		quick_save_listener: null,
 		sync_timer: null,
+		// 一批 save 已经发给游戏、还没等到 sync_ack 时为 true。此时不能再写盘：
+		// YSM 在扫描模型目录，扫描期间文件变化会被它判为错误（Model source changed while loading）。
+		sync_inflight: 0,
+		sync_pending: false,
+		sync_pending_silent: true,
+		sync_ack_timer: null,
 	};
+	const SYNC_ACK_TIMEOUT = 20000;
+	const SYNC_PENDING_DELAY = 120;
 
 	// ---------- 设置 ----------
 
@@ -71,6 +80,7 @@
 		peer.closed = true;
 		state.peers.delete(peer);
 		try { peer.socket.destroy(); } catch (err) { /* 断开已失效的 socket 不是可处理错误 */ }
+		if (state.peers.size === 0) endSyncWait();
 	}
 
 	function handleClient(socket) {
@@ -97,7 +107,7 @@
 			closePeer(peer);
 		});
 		socket.on('close', () => closePeer(peer));
-		send(peer, {type: 'hello_ack', plugin: PLUGIN_ID, plugin_version: '1.0.0', port: getPort()});
+		send(peer, {type: 'hello_ack', plugin: PLUGIN_ID, plugin_version: PLUGIN_VERSION, port: getPort()});
 	}
 
 	function dispatch(peer, line) {
@@ -121,6 +131,7 @@
 				Blockbench.showQuickMessage(message.ok
 					? `游戏已重载模型（${message.reload || 'unknown'}）`
 					: `游戏端重载失败：${message.reload || 'unknown'}`, 4000);
+				endSyncWait();
 				break;
 			case 'ping':
 				send(peer, {type: 'pong'});
@@ -217,6 +228,24 @@
 			for (let value of controllers) if (typeof value === 'string' && value) result.push(value);
 		}
 		return result;
+	}
+
+	/**
+	 * 只有内容真的变了才落盘：先写同目录临时文件再 rename，模型扫描永远看不到写了一半的文件。
+	 * 返回是否写入。字节完全一致时连 mtime 都不动，YSM 的目录 stamp 与模型 id 都不会白变。
+	 */
+	function writeIfChanged(file, data) {
+		let next = Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'utf8');
+		try {
+			let current = state.fs.readFileSync(file);
+			if (Buffer.isBuffer(current) && current.length === next.length && current.equals(next)) return false;
+		} catch (err) {
+			if (err && err.code !== 'ENOENT') throw err;
+		}
+		let temp = file + '.bbtmp';
+		state.fs.writeFileSync(temp, next);
+		state.fs.renameSync(temp, file);
+		return true;
 	}
 
 	/** 模型目录内的相对路径（统一正斜杠），目录外返回 null。 */
@@ -365,15 +394,13 @@
 		}
 		let mainPath = state.path.join(packDir, player.model.main);
 		// 直接落盘而不是 codec.write：后者对已存在的文件按 geometry identifier 合并，会改写 YSM 包。
-		state.fs.writeFileSync(mainPath, codec.compile());
-		written.push(relativeInside(packDir, mainPath));
+		if (writeIfChanged(mainPath, codec.compile())) written.push(relativeInside(packDir, mainPath));
 
 		for (let texture of Texture.all) {
 			if (!texture.path) continue;
 			let rel = relativeInside(packDir, texture.path);
 			if (!rel) continue;
-			state.fs.writeFileSync(texture.path, Buffer.from(texture.getBase64(), 'base64'));
-			written.push(rel);
+			if (writeIfChanged(texture.path, Buffer.from(texture.getBase64(), 'base64'))) written.push(rel);
 		}
 
 		written.push(...writeAnimationFiles(packDir));
@@ -402,8 +429,7 @@
 
 		for (let [file, group] of groups) {
 			let content = group.codec.compileFile(group.items);
-			state.fs.writeFileSync(file, autoStringify(content));
-			written.push(relativeInside(packDir, file));
+			if (writeIfChanged(file, autoStringify(content))) written.push(relativeInside(packDir, file));
 		}
 		return written;
 	}
@@ -412,6 +438,12 @@
 		let packDir = Project ? projectPackDir(Project) : null;
 		if (!packDir) {
 			if (!silent) Blockbench.showQuickMessage('当前项目不是从游戏打开的 YSM 模型', 3000);
+			return;
+		}
+		if (state.sync_inflight > 0) {
+			// 上一批同步游戏端还在重扫模型目录：记账，等 ack 回来只再跑一次。
+			state.sync_pending = true;
+			state.sync_pending_silent = state.sync_pending_silent && silent;
 			return;
 		}
 		rememberPack(Project, packDir);
@@ -424,12 +456,49 @@
 			for (let peer of state.peers) sendError(peer, (err && err.message) || String(err));
 			return;
 		}
+		if (!files.length) {
+			// 内容没变：不写盘、不通知游戏，避免 YSM 做无意义的重扫（会打断玩家当前模型）。
+			if (!silent) Blockbench.showQuickMessage('没有需要同步的改动', 3000);
+			return;
+		}
 		if (!state.peers.size) {
 			if (!silent) Blockbench.showQuickMessage(`已写回 ${files.length} 个文件（游戏未连接）`, 3000);
 			return;
 		}
 		for (let peer of state.peers) send(peer, {type: 'save', path: packDir, files});
+		beginSyncWait(state.peers.size);
 		if (!silent) Blockbench.showQuickMessage(`已写回 ${files.length} 个文件，等待游戏重载模型`, 3000);
+	}
+
+	/** Marks a batch of save messages as in flight so later saves wait for the game's ack. */
+	function beginSyncWait(peerCount) {
+		state.sync_inflight = peerCount;
+		clearTimeout(state.sync_ack_timer);
+		state.sync_ack_timer = setTimeout(() => {
+			// 游戏端没回应（卡死/断开但 socket 未关闭）：别把后续保存永久挂住。
+			console.warn('[bbconnectmod] 等待同步确认超时，继续下一次同步');
+			state.sync_inflight = 0;
+			state.sync_ack_timer = null;
+			flushPendingSync();
+		}, SYNC_ACK_TIMEOUT);
+	}
+
+	function endSyncWait() {
+		if (state.sync_inflight > 0) state.sync_inflight--;
+		if (state.sync_inflight > 0) return;
+		if (state.sync_ack_timer) {
+			clearTimeout(state.sync_ack_timer);
+			state.sync_ack_timer = null;
+		}
+		flushPendingSync();
+	}
+
+	function flushPendingSync() {
+		if (!state.sync_pending) return;
+		let silent = state.sync_pending_silent;
+		state.sync_pending = false;
+		state.sync_pending_silent = true;
+		setTimeout(() => syncToGame(silent), SYNC_PENDING_DELAY);
 	}
 
 	async function handleOpen(peer, message) {
@@ -477,6 +546,10 @@
 			clearTimeout(state.sync_timer);
 			state.sync_timer = null;
 		}
+		clearTimeout(state.sync_ack_timer);
+		state.sync_ack_timer = null;
+		state.sync_inflight = 0;
+		state.sync_pending = false;
 	}
 
 	// ---------- 界面 ----------
@@ -525,7 +598,7 @@
 		description: '把 Yes Steve Model 文件夹模型接到 Blockbench：游戏内点击「连接到 BB」打开项目，保存即写回并通知游戏重载模型。',
 		icon: 'cable',
 		variant: 'desktop',
-		version: '1.0.0',
+		version: PLUGIN_VERSION,
 		min_version: '5.3.85',
 		dependencies: ['ysm_utils'],
 		tags: ['Minecraft: Java Edition', 'Yes Steve Model', 'Bridge'],
