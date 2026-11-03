@@ -154,9 +154,47 @@ export const DANGEROUS_APIS = [
 	{ re: /document\.cookie/, reason: '读取 cookie' },
 	{ re: /\bnavigator\.sendBeacon\s*\(/, reason: '静默外发数据' },
 	{ re: /\bclipboard\.(?:readText|read)\s*\(/, reason: '读取剪贴板内容' },
-	{ re: /require\s*\(\s*['"](?:net|tls|dgram|vm|dns)['"]/, reason: '直接使用底层网络/虚拟机模块' },
+	{ re: /require\s*\(\s*['"](?:node:)?(?:tls|dgram|vm|dns)['"]/, reason: '直接使用底层网络/虚拟机模块' },
 	{ re: /\bos\.homedir\s*\(\s*\)[\s\S]{0,200}?require\s*\(\s*['"]fs['"]/, reason: '枚举家目录后访问文件系统' },
 ];
+
+/**
+ * `net` 模块的受限例外。
+ *
+ * 场景：插件需要在本机监听、等外部程序（例如游戏内模组）主动拨号，而 Blockbench 的插件沙箱只提供
+ * `net`/`tls`/`https` 三个网络模块且 `http` 不可用，因此「本地监听」只能用 `net.createServer`。
+ *
+ * 放行的条件全部是确定性判定，任一条不满足即仍按危险 API 阻断：
+ * 1. 有本地监听调用（`createServer` 之后的 `.listen(...)`）；
+ * 2. 每个 `.listen(...)` 都显式绑定了回环地址字面量 `127.0.0.1` / `::1`；
+ * 3. 全文不出现通配监听地址（`0.0.0.0` / `::`）；
+ * 4. 不用 `net` 发起出站连接（`net.connect` / `net.createConnection` / `new net.Socket`）。
+ *
+ * 出站数据另由 `INSECURE_EGRESS_RE` / `EGRESS_RE` 与语义层覆盖，这里只收敛监听面。
+ */
+export const NET_MODULE_RE = /require\s*\(\s*['"](?:node:)?net['"]\s*(?:,|\))/;
+export const NET_CLIENT_RE = /\bnet\.(?:connect|createConnection)\s*\(|\bnew\s+net\.Socket\s*\(/;
+const NET_WILDCARD_RE = /['"](?:0\.0\.0\.0|::|\[::\]|::0)['"]/;
+const LOOPBACK_LITERAL_RE = /['"](?:127\.0\.0\.1|::1)['"]/;
+const LISTEN_CALL_RE = /\.listen\s*\(([^;]{0,240}?)\)/g;
+
+export function netLoopbackVerdict(text) {
+	if (!NET_MODULE_RE.test(text)) return { allowed: true };
+	if (NET_CLIENT_RE.test(text)) {
+		return { allowed: false, reason: '使用 net 模块发起出站连接（net 仅允许本地回环监听）' };
+	}
+	const calls = [...text.matchAll(LISTEN_CALL_RE)];
+	if (!calls.length) {
+		return { allowed: false, reason: '引入 net 模块但没有本地监听调用（net 仅允许本地回环监听）' };
+	}
+	if (calls.some((call) => !LOOPBACK_LITERAL_RE.test(call[1]))) {
+		return { allowed: false, reason: 'net 监听未显式绑定回环地址 127.0.0.1/::1' };
+	}
+	if (NET_WILDCARD_RE.test(text)) {
+		return { allowed: false, reason: '出现通配监听地址（net 仅允许回环地址）' };
+	}
+	return { allowed: true };
+}
 
 /** 明文 HTTP 外发：直接拒绝（可被中间人篡改，且是后门常见信道）。 */
 export const INSECURE_EGRESS_RE = /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b[\s\S]{0,80}?http:\/\//;

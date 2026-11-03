@@ -34,7 +34,8 @@
 | 体量 | ✅ | ≤40 文件、单文件 ≤320 KB、总量 ≤2 MB；插件目录内二进制仅允许图片且 ≤320 KB |
 | 清单 | ✅ | 必填字段、semver、tags 数量、`new_repository_format`、`repository`/`bug_tracker` 非官方库 |
 | 注册一致性 | ✅ | `BBPlugin.register` 的 id/version 必须与 `plugins.json` 一致；`updates.json` 版本必须一致 |
-| 危险 API | ✅ | `child_process`、`eval`/`new Function`、`process.binding`、cookie/剪贴板读取、`net`/`tls`/`vm` 模块 |
+| 危险 API | ✅ | `child_process`、`eval`/`new Function`、`process.binding`、cookie/剪贴板读取、`tls`/`dgram`/`vm`/`dns` 模块、`net` 出站连接 |
+| `net` 本地监听 | ✅ 未绑回环时阻断 | **受限例外**：插件需要本机监听等外部程序拨号时可用 `net`，但必须同时满足全部条件——有 `.listen(...)`、每个监听都显式绑定 `127.0.0.1`/`::1`、全文无 `0.0.0.0`/`::` 通配地址、无 `net.connect`/`net.createConnection`/`new net.Socket`。判定在 `policy.mjs` 的 `netLoopbackVerdict()` |
 | 外联 | ✅ 明文 HTTP；⚠ 非白名单域名 | 白名单：jsDelivr、GitHub |
 | 混淆 | ✅ | hex 变量名、密集转义、超长 base64、密集 `fromCharCode` |
 | 提示注入 | ✅ | 文本中出现「忽略以上指令」等操纵审查器的内容 |

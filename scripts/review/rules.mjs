@@ -23,6 +23,7 @@ import {
 	EGRESS_RE,
 	INSECURE_EGRESS_RE,
 	LIMITS,
+	NET_MODULE_RE,
 	OBFUSCATION_CHECKS,
 	PLUGIN_ID_RE,
 	PROMPT_INJECTION_CHECKS,
@@ -30,6 +31,7 @@ import {
 	SEMVER_RE,
 	TEXT_EXTENSIONS,
 	WARN_TERMS,
+	netLoopbackVerdict,
 } from './policy.mjs';
 
 const MAX_HITS_PER_CHECK = 5;
@@ -446,6 +448,20 @@ export function runRules(ctx) {
 					reason: api.reason,
 				});
 			}
+		}
+		// net 模块：仅回环监听放行，其余仍按危险 API 阻断
+		const netVerdict = netLoopbackVerdict(text);
+		if (!netVerdict.allowed) {
+			const match = NET_MODULE_RE.exec(text);
+			add({
+				check: 'dangerous-api',
+				severity: 'block',
+				category: 'malicious',
+				file: path,
+				line: match ? lineAt(text, match.index) : 1,
+				quote: match ? quote(text, match.index) : '',
+				reason: netVerdict.reason,
+			});
 		}
 		// 明文 HTTP 外发
 		const insecure = INSECURE_EGRESS_RE.exec(text);
