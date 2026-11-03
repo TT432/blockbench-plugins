@@ -63,7 +63,8 @@
 - 用两个合成插件（`bbconnect_test_dependent` 依赖 `bbconnect_test_dep`），先在真实实例里只加载依赖者：断言 `installed=true`、`disabled=false`、`dependency_blocked=true`、`onload` 未执行、`installed_plugins` 条目已记录依赖；插件浏览器显示「⚠ 缺少前置插件」且 `title` 指出缺失的前置与其原因。
 - 再加载前置：断言依赖者自动执行 `onload`、`dependency_blocked=false`、`missing_dependencies` 为空。
 - 真实插件回归：`bbconnectmod`（依赖 `ysm_utils`）在前置缺席时不监听端口；加载前置后自动开始监听。
-- 运行期卸载/禁用前置（2026-11-03 实测，真实 `bbconnectmod` + 同名 id 的替身前置，因真实 `ysm_utils` 的 `onload` 在自动化环境里弹阻塞式原生对话框）：卸载前置后依赖者立刻 `dependency_blocked=true`、`disabled=false`、`missing_dependencies=['ysm_utils']`，且 `onunload` 生效（监听端口消失、`BarItems` 动作在重启后的起始状态里不存在）；重新安装前置（`loadFromFile` → `loadBlockedDependents`）后 `dependency_blocked=false`、`missing_dependencies=[]`、动作重新注册、端口重新监听；禁用前置与重新启用得到同样的两段结果。
+- 运行期卸载/禁用前置（2026-11-03 实测，真实 `bbconnectmod` 1.0.1 + 真实 `ysm_utils` 2.5.2-community.1；自动化装载用 `loadFromFile(file, false)`，`first=true` 那条路径内含 `confirm()` 会卡死渲染线程）：卸载前置后依赖者立刻 `dependency_blocked=true`、`disabled=false`、`missing_dependencies=['ysm_utils']`，且 `onunload` 生效（监听端口消失、`BarItems` 动作在重启后的起始状态里不存在）；重新安装前置（`loadFromFile` → `loadBlockedDependents`）后 `dependency_blocked=false`、`missing_dependencies=[]`、动作重新注册、端口重新监听；禁用前置与重新启用得到同样的两段结果。
+- 前置插件按自身配置换端口时，监听随插件重载迁移：`bbconnectmod_port` 41234 → 41235 → 恢复 41234，`netstat` 每次都只剩一个监听者且只在 `127.0.0.1` 上。
 - 插件浏览器里被挡住的插件显示「⚠ 缺少前置插件」、`Depends on: ysm_utils ⚠`、红色原因清单与「Install dependencies」按钮，且**不**显示「禁用/启用」按钮；前置是侧载（`source=file`）且已卸载时，点该按钮会提示「ysm_utils 不在插件仓库中，无法自动安装」，需要用户用「从文件加载」重新装入。
 
 ## 已知边界
