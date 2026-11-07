@@ -6516,6 +6516,18 @@ function readYsmFile(packDirectory) {
 function saveYsmFile(ysmJson, ysmJsonPath) {
   let result = autoStringify(saveNormalization(ysmJson));
   fs.writeFileSync(ysmJsonPath, result), Blockbench.showQuickMessage(tl("menu.ysm_utils.save_success"), 3e3);
+  // ysm.json 是模型包的一部分（缩放、额外动画、轮盘配置等）。桥接类插件（如 BB Connect）需要知道
+  // 配置已经被改写，才能把这次保存排进同步、让游戏端重扫模型目录；没有监听者时这里是空操作。
+  // 监听者异常不能让「保存配置」本身失败，所以这里隔离一次。
+  if (Blockbench.dispatchEvent) {
+    try {
+      Blockbench.dispatchEvent("ysm_utils_pack_info_saved", {
+        path: path.dirname(ysmJsonPath)
+      });
+    } catch (err) {
+      console.warn("[ysm_utils] pack info listener failed", err);
+    }
+  }
 }
 
 function getSha256(ysmJson) {
@@ -7091,7 +7103,7 @@ BBPlugin.register("ysm_utils", {
   description: packageInfo_description,
   icon: "card_membership",
   variant: "desktop",
-  version: "2.5.2-community.1",
+  version: "2.5.2-community.2",
   min_version: "5.3.74",
   tags: [ "Minecraft: Java Edition", "Yes Steve Model", "Mod" ],
   await_loading: !0,
