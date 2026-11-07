@@ -5,7 +5,7 @@
 - 原作者：tartaric_acid。
 - 上游仓库：<https://github.com/YesSteveModel/YSM-Utils-Plugins>。
 - 基线：2.5.2，提交 `627eb75b020b79adb205b8f1258bb7a606850a8f`。
-- 注册表版本：`2.5.2-community.1`，插件 ID：`ysm_utils`。
+- 注册表版本：`2.5.2-community.2`，插件 ID：`ysm_utils`。
 - 本目录的 `source.patch.txt` 包含相对该上游提交的完整源码、打包配置与直接依赖版本变更。
 
 ## 重建

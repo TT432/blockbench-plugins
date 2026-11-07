@@ -1,6 +1,6 @@
 {
   "plugin": "ysm_utils",
-  "version": "2.5.2-community.1",
+  "version": "2.5.2-community.2",
   "sourceBytes": 305343,
   "ordinaryImport": {
     "animations": 162,
@@ -22,7 +22,8 @@
     "download retry",
     "corrupt template rejected",
     "destination race rejected",
-    "existing destination preserved"
+    "existing destination preserved",
+    "pack info save event announced"
   ],
   "passed": true
 }

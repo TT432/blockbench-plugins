@@ -1,4 +1,17 @@
 {
+	"2.5.2-community.2": {
+		"title": "YSM 2.5.2 社区版 — 配置保存通知",
+		"date": "2026-11-07",
+		"author": "TheDivisionISAC",
+		"categories": [
+			{
+				"title": "兼容",
+				"list": [
+					"保存「当前信息」或「轮盘配置」后广播 ysm_utils_pack_info_saved 事件，供 BB Connect 等桥接插件把 ysm.json 的改动同步给游戏端；没有监听者时行为不变。"
+				]
+			}
+		]
+	},
 	"2.5.2-community.1": {
 		"title": "YSM 2.5.2 社区版兼容修订",
 		"date": "2026-11-03",
