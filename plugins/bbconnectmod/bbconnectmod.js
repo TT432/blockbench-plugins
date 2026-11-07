@@ -13,7 +13,7 @@
 
 	const PLUGIN_ID = 'bbconnectmod';
 	const PROTOCOL_VERSION = 1;
-	const PLUGIN_VERSION = '1.0.1';
+	const PLUGIN_VERSION = '1.0.2';
 	const DEFAULT_PORT = 41234;
 	const MAX_LINE_BYTES = 16 * 1024 * 1024;
 	const LS_PORT = 'bbconnectmod_port';
@@ -28,6 +28,10 @@
 		detail: '',
 		save_listener: null,
 		quick_save_listener: null,
+		pack_info_listener: null,
+		// 包目录 → 上次同步时 ysm.json 的原文。ysm_utils 的「当前信息」「轮盘配置」直接改写这个文件，
+		// 本插件不写它，只能靠内容对比发现变化，否则游戏端永远不会因配置改动而重载。
+		manifest_stamps: new Map(),
 		sync_timer: null,
 		// 一批 save 已经发给游戏、还没等到 sync_ack 时为 true。此时不能再写盘：
 		// YSM 在扫描模型目录，扫描期间文件变化会被它判为错误（Model source changed while loading）。
@@ -201,6 +205,20 @@
 		return JSON.parse(state.fs.readFileSync(file, 'utf8'));
 	}
 
+	function manifestText(dir) {
+		try {
+			return state.fs.readFileSync(state.path.join(dir, 'ysm.json'), 'utf8');
+		} catch (err) {
+			if (err && err.code === 'ENOENT') return null;
+			throw err;
+		}
+	}
+
+	/** 把磁盘上当前的 ysm.json 记为同步基线：打开包时调用，避免把历史改动当成新改动去重载。 */
+	function resetManifestBaseline(dir) {
+		state.manifest_stamps.set(dir, manifestText(dir));
+	}
+
 	function playerSection(manifest) {
 		let files = manifest && manifest.files;
 		return files && files.player ? files.player : null;
@@ -346,6 +364,8 @@
 			// 同一个包再次连接时只切回已有项目：重复导入会让贴图/动画在这份项目里翻倍。
 			existing.select();
 			rememberPack(existing, packDir);
+			// 重连不重置基线：游戏端上次重载之后磁盘上的 ysm.json 可能又被改过（未连接期间），
+			// 保留旧基线才能在下一次同步时把这次重载补上。
 			Blockbench.showQuickMessage(`YSM 模型已在 Blockbench 中打开：${state.path.basename(packDir)}`, 3000);
 			return existing;
 		}
@@ -358,6 +378,7 @@
 		if (!Project) throw new Error('无法创建 Blockbench 项目');
 
 		rememberPack(Project, packDir);
+		resetManifestBaseline(packDir);
 		// Ctrl+S 只写 .bbmodel；几何由本插件写回，避免核心 bedrock codec 的「按 identifier 合并」
 		// 去改写 YSM 的模型文件。保存位置放在插件自管目录，不往模型包里塞多余文件。
 		Project.export_path = '';
@@ -388,6 +409,13 @@
 		}
 		let written = [];
 
+		// ysm.json 的配置（缩放、额外动画、轮盘配置等）由 ysm_utils 的界面直接写盘，本插件从不写它。
+		// 但游戏端只有收到 save 才会重扫目录，所以内容变了必须把它算进这一批同步里。
+		let manifestContent = manifestText(packDir);
+		let baseline = state.manifest_stamps.get(packDir);
+		// 基线在整批写回成功后才更新：中途抛错时保留旧基线，下次同步还能识别出这份配置改动。
+		if (baseline !== undefined && baseline !== manifestContent) written.push('ysm.json');
+
 		let codec = (project.format && project.format.codec) || (typeof Format !== 'undefined' ? Format.codec : null);
 		if (!codec || typeof codec.compile !== 'function') {
 			throw new Error('当前项目格式没有可用的几何导出器');
@@ -404,7 +432,7 @@
 		}
 
 		written.push(...writeAnimationFiles(packDir));
-		return written.filter(Boolean);
+		return {files: written.filter(Boolean), manifest: manifestContent};
 	}
 
 	function writeAnimationFiles(packDir) {
@@ -447,25 +475,29 @@
 			return;
 		}
 		rememberPack(Project, packDir);
-		let files;
+		let result;
 		try {
-			files = exportPack(Project);
+			result = exportPack(Project);
 		} catch (err) {
 			console.error('[bbconnectmod] 写回模型包失败', err);
 			Blockbench.showQuickMessage(`写回模型包失败：${(err && err.message) || err}`, 5000);
 			for (let peer of state.peers) sendError(peer, (err && err.message) || String(err));
 			return;
 		}
+		let files = result.files;
 		if (!files.length) {
 			// 内容没变：不写盘、不通知游戏，避免 YSM 做无意义的重扫（会打断玩家当前模型）。
 			if (!silent) Blockbench.showQuickMessage('没有需要同步的改动', 3000);
 			return;
 		}
 		if (!state.peers.size) {
+			// 没有连接时几何写回是幂等的，但游戏端还没收到 ysm.json 的改动：
+			// 基线保持旧值，等下次连接后的同步把这次重载补上。
 			if (!silent) Blockbench.showQuickMessage(`已写回 ${files.length} 个文件（游戏未连接）`, 3000);
 			return;
 		}
 		for (let peer of state.peers) send(peer, {type: 'save', path: packDir, files});
+		state.manifest_stamps.set(packDir, result.manifest);
 		beginSyncWait(state.peers.size);
 		if (!silent) Blockbench.showQuickMessage(`已写回 ${files.length} 个文件，等待游戏重载模型`, 3000);
 	}
@@ -532,12 +564,37 @@
 		}, 150);
 	}
 
+	function sameDir(a, b) {
+		if (!a || !b) return false;
+		let left = state.path.resolve(a);
+		let right = state.path.resolve(b);
+		if (left === right) return true;
+		try {
+			// realpath 能解析 Windows 上大小写不同的同一目录；插件环境没有 process，不能靠平台判断。
+			return state.fs.realpathSync(left) === state.fs.realpathSync(right);
+		} catch (err) {
+			return left.toLowerCase() === right.toLowerCase();
+		}
+	}
+
+	/**
+	 * ysm_utils 保存 ysm.json（「当前信息」/「轮盘配置」）后广播的事件。
+	 * 文件已经由它写好了，本插件只需要把这次改动排进下一批同步，让游戏端重扫目录。
+	 */
+	function handlePackInfoSaved(data) {
+		if (!Project || !data || typeof data.path !== 'string') return;
+		let packDir = projectPackDir(Project);
+		if (!packDir || !sameDir(packDir, data.path)) return;
+		scheduleSync();
+	}
+
 	function installSaveHooks() {
 		state.save_listener = Blockbench.on('save_project', scheduleSync);
 		state.quick_save_listener = Blockbench.on('quick_save_model', scheduleSync);
+		state.pack_info_listener = Blockbench.on('ysm_utils_pack_info_saved', handlePackInfoSaved);
 	}
 	function removeSaveHooks() {
-		for (let key of ['save_listener', 'quick_save_listener']) {
+		for (let key of ['save_listener', 'quick_save_listener', 'pack_info_listener']) {
 			let listener = state[key];
 			if (listener && typeof listener.delete === 'function') listener.delete();
 			state[key] = null;
@@ -550,6 +607,7 @@
 		state.sync_ack_timer = null;
 		state.sync_inflight = 0;
 		state.sync_pending = false;
+		state.manifest_stamps.clear();
 	}
 
 	// ---------- 界面 ----------

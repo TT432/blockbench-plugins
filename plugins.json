@@ -47,7 +47,7 @@
 		"author": "tt432",
 		"description": "把 Yes Steve Model 文件夹模型接到 Blockbench：游戏内「连接到 BB」直接打开项目，保存即写回模型文件夹并通知游戏重载。依赖 ysm_utils。",
 		"icon": "cable",
-		"version": "1.0.1",
+		"version": "1.0.2",
 		"variant": "desktop",
 		"min_version": "5.3.85",
 		"tags": [
